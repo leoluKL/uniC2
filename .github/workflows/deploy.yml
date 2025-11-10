@@ -19,14 +19,17 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /opt/UNIC2 || (sudo mkdir -p /opt/UNIC2 && sudo chown ubuntu:ubuntu /opt/UNIC2 && cd /opt/UNIC2)
+            sudo mkdir -p /opt/UNIC2
+            sudo chown ubuntu:ubuntu /opt/UNIC2
+            cd /opt/UNIC2
+
             if [ ! -d .git ]; then
-              git clone https://github.com/leoluKL/uniC2.git /opt/UNIC2
-              cd /opt/UNIC2/DeviceManagement
+              git clone https://github.com/leoluKL/uniC2.git .
             else
-              cd /opt/UNIC2/DeviceManagement
               git fetch origin main
               git reset --hard origin/main
             fi
+
+            cd DeviceManagement
             npm ci --omit=dev
             sudo systemctl restart devicemanagement.service || true
