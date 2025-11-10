@@ -1,18 +1,17 @@
-name: Deploy to EC2
+name: Deploy to EC2 (Sequential)
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  deploy:
+  deploy-ec2-a:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to EC2
+      - name: Deploy to EC2 A
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_A }}
@@ -22,14 +21,39 @@ jobs:
             sudo mkdir -p /opt/UNIC2
             sudo chown ubuntu:ubuntu /opt/UNIC2
             cd /opt/UNIC2
-
             if [ ! -d .git ]; then
               git clone https://github.com/leoluKL/uniC2.git .
             else
               git fetch origin main
               git reset --hard origin/main
             fi
+            cd DeviceManagement
+            npm ci --omit=dev
+            sudo systemctl restart devicemanagement.service || true
 
+  deploy-ec2-b:
+    runs-on: ubuntu-latest
+    needs: deploy-ec2-a
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 B
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_B }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo mkdir -p /opt/UNIC2
+            sudo chown ubuntu:ubuntu /opt/UNIC2
+            cd /opt/UNIC2
+            if [ ! -d .git ]; then
+              git clone https://github.com/leoluKL/uniC2.git .
+            else
+              git fetch origin main
+              git reset --hard origin/main
+            fi
             cd DeviceManagement
             npm ci --omit=dev
             sudo systemctl restart devicemanagement.service || true
