@@ -18,6 +18,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            export KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
             sudo mkdir -p /opt/UNIC2
             sudo chown ubuntu:ubuntu /opt/UNIC2
             cd /opt/UNIC2
@@ -29,6 +30,8 @@ jobs:
             fi
             cd DeviceManagement
             npm ci --omit=dev
+            echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
+            sudo systemctl daemon-reexec
             sudo systemctl restart devicemanagement.service || true
 
   deploy-ec2-b:
@@ -45,6 +48,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            export KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
             sudo mkdir -p /opt/UNIC2
             sudo chown ubuntu:ubuntu /opt/UNIC2
             cd /opt/UNIC2
@@ -56,4 +60,6 @@ jobs:
             fi
             cd DeviceManagement
             npm ci --omit=dev
+            echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
+            sudo systemctl daemon-reexec
             sudo systemctl restart devicemanagement.service || true
