@@ -24,7 +24,6 @@ const corsOptions = {
 
 // ✅ Handle all CORS preflights explicitly
 app.use(cors(corsOptions))
-app.options("*", cors(corsOptions))
 
 // Routes
 app.use("/api/device", deviceRoutes)
