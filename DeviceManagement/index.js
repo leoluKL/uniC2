@@ -5,20 +5,31 @@ import cors from "cors"
 const app = express()
 app.use(express.json())
 
-// ✅ Enable CORS for all relevant origins and include OPTIONS handler
+// ✅ Allow defined origins but handle missing origin safely
+const allowedOrigins = ["http://localhost:5173", "https://unic2.stenmss.org"]
+
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://unic2.stenmss.org"],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+      callback(null, true)
+    } else {
+      console.warn("Blocked by CORS:", origin)
+      callback(new Error("Not allowed by CORS"))
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }
-app.use(cors(corsOptions))
-app.options("*", cors(corsOptions)) // ✅ handle preflight requests explicitly
 
-// ✅ no keycloak middleware needed — JWT verification happens inside route-level requireRole
+// ✅ Handle all CORS preflights explicitly
+app.use(cors(corsOptions))
+app.options("*", cors(corsOptions))
+
+// Routes
 app.use("/api/device", deviceRoutes)
 
-// ✅ Root health check
+// Health check
 app.get("/", (req, res) => {
   res.send("DeviceManagement API is running")
 })
