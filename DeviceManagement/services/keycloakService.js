@@ -43,8 +43,7 @@ export function requireRole(role) {
 
 // 🔹 Admin token fetch remains the same
 export async function getAdminToken() {
-    console.log("-----")
-    console.log({KEYCLOAK_URL,REALM,CLIENT_ID,CLIENT_SECRET})
+    //console.log({KEYCLOAK_URL,REALM,CLIENT_ID,CLIENT_SECRET})
     const res = await fetch(`${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

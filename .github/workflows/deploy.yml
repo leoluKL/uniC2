@@ -30,7 +30,12 @@ jobs:
             fi
             cd DeviceManagement
             npm ci --omit=dev
-            echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
+            # Update or insert secret only once in /etc/environment
+            if grep -q "^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=" /etc/environment; then
+              sudo sed -i "s|^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=.*|KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}|" /etc/environment
+            else
+              echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
+            fi
             sudo systemctl daemon-reexec
             sudo systemctl restart devicemanagement.service || true
 
@@ -59,6 +64,10 @@ jobs:
             fi
             cd DeviceManagement
             npm ci --omit=dev
-            echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
+            if grep -q "^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=" /etc/environment; then
+              sudo sed -i "s|^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=.*|KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}|" /etc/environment
+            else
+              echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
+            fi
             sudo systemctl daemon-reexec
             sudo systemctl restart devicemanagement.service || true
