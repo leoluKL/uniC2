@@ -7,7 +7,18 @@ const REALM = process.env.KEYCLOAK_REALM || 'unic2'
 const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || 'unic2-devicemanagement-backend'
 const CLIENT_SECRET = process.env.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET
 
-let cachedKey = null
+let UNIC2_ASSET_SCOPE_ID = null
+
+export async function initKeycloakCache() {
+    const token = await getAdminToken()
+    const scopeRes = await fetch(`${KEYCLOAK_URL}/admin/realms/${REALM}/client-scopes`, {
+        headers: { Authorization: `Bearer ${token}` }
+    })
+    const scopes = await scopeRes.json()
+    const scope = scopes.find(s => s.name === "unic2-asset-scope")
+    if (!scope) throw new Error("Scope not found: unic2-asset-scope")
+    UNIC2_ASSET_SCOPE_ID = scope.id
+}
 
 // ✅ Fetch and cache valid PEM key (same as test.js)
 async function getPublicKey() {
@@ -74,9 +85,22 @@ export async function createClient({ clientId,assetType }) {
             enabled: true,
             publicClient: false,
             secret: generatedSecret,
+            serviceAccountsEnabled: true,
             attributes: { ...assetAttr }
         })
     })
+
+    const location = createRes.headers.get("Location")
+    if (!location) throw new Error("Missing Location header from create client")
+    const clientUUID = location.split("/").pop()
+
+    if (!UNIC2_ASSET_SCOPE_ID) throw new Error("ASSET_SCOPE_ID not initialized")
+
+    const attachRes = await fetch(`${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${clientUUID}/default-client-scopes/${UNIC2_ASSET_SCOPE_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` }
+    })
+
     return { clientId, secret: generatedSecret, attributes: { ...assetAttr } }
 }
 

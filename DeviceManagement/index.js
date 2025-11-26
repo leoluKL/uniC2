@@ -1,9 +1,11 @@
 import express from "express"
 import deviceRoutes from "./routes/deviceRoutes.js"
 import cors from "cors"
+import { initKeycloakCache } from "./services/keycloakService.js"
 
 const app = express()
 app.use(express.json())
+await initKeycloakCache()        // <-- run once on startup
 
 // ✅ Allow defined origins but handle missing origin safely
 const allowedOrigins = ["http://localhost:5173", "https://unic2.stenmss.org"]
