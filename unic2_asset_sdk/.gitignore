@@ -8,6 +8,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 .venv/*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
 .vscode/*
 !.vscode/extensions.json
 .idea
