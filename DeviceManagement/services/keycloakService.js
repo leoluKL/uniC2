@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import jwt from 'jsonwebtoken'
+import * as jose from 'jose'
 import crypto from "crypto"
 
 const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'https://unic2keycloak.stenmss.org'
@@ -8,6 +8,11 @@ const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || 'unic2-devicemanagement-back
 const CLIENT_SECRET = process.env.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET
 
 let UNIC2_ASSET_SCOPE_ID = null
+
+const ISSUER = `${KEYCLOAK_URL}/realms/${REALM}`
+const JWKS = jose.createRemoteJWKSet(
+    new URL(`${ISSUER}/protocol/openid-connect/certs`)
+)
 
 export async function initKeycloakCache() {
     const token = await getAdminToken()
@@ -20,30 +25,25 @@ export async function initKeycloakCache() {
     UNIC2_ASSET_SCOPE_ID = scope.id
 }
 
-// ✅ Fetch and cache valid PEM key (same as test.js)
-async function getPublicKey() {
-    const res = await fetch(`${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/certs`)
-    const data = await res.json()
-    const key = data.keys.find(k => k.use === "sig" && k.kty === "RSA")
-
-    const jwk = { kty: "RSA", n: key.n, e: key.e }
-    const publicKey = crypto.createPublicKey({ key: jwk, format: "jwk" })
-    const pem = publicKey.export({ type: "pkcs1", format: "pem" }) // ✅ exact "RSA PUBLIC KEY"
-
-    return pem
-}
-
-// 🔹 Verify JWT and check role (must have role) and aud must have the client_id of this backend
+// Verify JWT and check role (must have role) and aud must have the client_id of this backend
 export function requireRole(role) {
     return async (req, res, next) => {
         const auth = req.headers.authorization
         if (!auth?.startsWith('Bearer ')) return res.status(403).json({ error: 'Missing token' })
         const token = auth.split(' ')[1]
         try {
-            const decoded = jwt.verify(token, await getPublicKey(), { algorithms: ["RS256"] })
-            const roles = decoded.realm_access?.roles || []
-            if (!decoded.aud?.includes(CLIENT_ID)) return res.status(403).json({ error: 'Invalid audience' })
+            const { payload } = await jose.jwtVerify(token, JWKS, {
+                issuer: ISSUER,
+                algorithms: ['RS256']
+            })
+
+            const roles = payload.realm_access?.roles || []
+            const aud = payload.aud
+            const audOk = Array.isArray(aud) ? aud.includes(CLIENT_ID) : aud === CLIENT_ID
+
+            if (!audOk) return res.status(403).json({ error: 'Invalid audience' })
             if (!roles.includes(role)) return res.status(403).json({ error: 'Forbidden: missing role' })
+            req.tokenPayload = payload
             return next()
         } catch (err) {
             console.error('❌ Invalid token:', err.message)
