@@ -11,21 +11,21 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - host: ${{ secrets.EC2_A }}
-            key: ${{ secrets.EC2_SSH_KEY }}
-          - host: ${{ secrets.EC2_B }}
-            key: ${{ secrets.EC2_SSH_KEY }}
+          - host: EC2_A
+            key: EC2_SSH_KEY
+          - host: EC2_B
+            key: EC2_SSH_KEY
           # add more if needed
-          # - host: ${{ secrets.EC2_C }}
-          #   key: ${{ secrets.EC2_C_SSH_KEY }}
+          # - host: 
+          #   key: 
 
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ matrix.target.host }}
+          host: ${{ secrets[matrix.target.host] }}
           username: ubuntu
-          key: ${{ matrix.target.key }}
+          key: ${{ secrets[matrix.target.key] }}
           script: |
             sudo mkdir -p /opt/UNIC2
             sudo chown ubuntu:ubuntu /opt/UNIC2
