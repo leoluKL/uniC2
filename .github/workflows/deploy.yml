@@ -5,69 +5,71 @@ on:
     branches: [ main ]
 
 jobs:
-  deploy-ec2-a:
+  deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - host: ${{ secrets.EC2_A }}
+            key: ${{ secrets.EC2_SSH_KEY }}
+          - host: ${{ secrets.EC2_B }}
+            key: ${{ secrets.EC2_SSH_KEY }}
+          # add more if needed
+          # - host: ${{ secrets.EC2_C }}
+          #   key: ${{ secrets.EC2_C_SSH_KEY }}
 
-      - name: Deploy to EC2 A
+    steps:
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_A }}
+          host: ${{ matrix.target.host }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ matrix.target.key }}
           script: |
-            export KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
             sudo mkdir -p /opt/UNIC2
             sudo chown ubuntu:ubuntu /opt/UNIC2
             cd /opt/UNIC2
+
             if [ ! -d .git ]; then
               git clone https://github.com/leoluKL/uniC2.git .
             else
               git fetch origin main
               git reset --hard origin/main
             fi
+
+            # ===== DeviceManagement Backend =====
             cd DeviceManagement
             npm ci --omit=dev
-            # Update or insert secret only once in /etc/environment
-            if grep -q "^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=" /etc/environment; then
-              sudo sed -i "s|^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=.*|KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}|" /etc/environment
-            else
-              echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
-            fi
-            sudo systemctl daemon-reexec
-            sudo systemctl restart devicemanagement.service || true
 
-  deploy-ec2-b:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+            # write /etc/devicemanagement.env
+            sudo bash -c "cat >/etc/devicemanagement.env" << 'EOF'
+            KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
+            NODE_ENV=production
+            PORT=8081
+            EOF
+            sudo chown root:root /etc/devicemanagement.env
+            sudo chmod 600 /etc/devicemanagement.env
 
-      - name: Deploy to EC2 B
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_B }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            export KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
-            sudo mkdir -p /opt/UNIC2
-            sudo chown ubuntu:ubuntu /opt/UNIC2
-            cd /opt/UNIC2
-            if [ ! -d .git ]; then
-              git clone https://github.com/leoluKL/uniC2.git .
-            else
-              git fetch origin main
-              git reset --hard origin/main
-            fi
-            cd DeviceManagement
-            npm ci --omit=dev
-            if grep -q "^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=" /etc/environment; then
-              sudo sed -i "s|^KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=.*|KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}|" /etc/environment
-            else
-              echo "KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET}" | sudo tee -a /etc/environment
-            fi
-            sudo systemctl daemon-reexec
-            sudo systemctl restart devicemanagement.service || true
+            # write devicemanagement.service
+            sudo bash -c "cat >/etc/systemd/system/devicemanagement.service" << 'EOF'
+            [Unit]
+            Description=Unic2 DeviceManagement Backend
+            After=network.target
+
+            [Service]
+            Type=simple
+            User=ubuntu
+            WorkingDirectory=/opt/UNIC2/DeviceManagement
+            EnvironmentFile=/etc/devicemanagement.env
+            ExecStart=/usr/bin/node index.js
+            Restart=always
+            RestartSec=5
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable devicemanagement.service
+            sudo systemctl restart devicemanagement.service
