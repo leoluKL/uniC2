@@ -1,45 +1,48 @@
 // asset-ws-backend/server.js
-const http = require("http")
-const WebSocket = require("ws")
+import 'dotenv/config'
+import http from "http";
+import { WebSocketServer } from "ws";
+import * as jose from "jose";
 
-const PORT = process.env.PORT || 8082
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL
+const REALM = process.env.KEYCLOAK_REALM
+const ISSUER = `${KEYCLOAK_URL}/realms/${REALM}`
+const JWKS = jose.createRemoteJWKSet(new URL(`${ISSUER}/protocol/openid-connect/certs`))
+
+const PORT = process.env.PORT
 
 // In-memory connection & subscription registry
 const asset_ws_map = new Map()          
 const opUser_ws_map = new Map()         
 const opUser_subscribedAssets_map = new Map()      
 
-// TODO: replace with real Keycloak JWKS verification
-function authenticateAndIdentify(req) {
+// Keycloak JWKS verification
+async function authenticateAndIdentify(req) {
     const protoHeader = req.headers["sec-websocket-protocol"]
     if (!protoHeader) throw new Error("Missing Sec-WebSocket-Protocol")
     const token = protoHeader.split(",")[0].trim()
-
-    // ⚠️ placeholder decode: NOT secure
-    let decoded
-    try {
-        const parts = token.split(".")
-        decoded = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"))
-    } catch {
-        throw new Error("Invalid JWT format")
+    const { payload } = await jose.jwtVerify(token, JWKS, {
+        issuer: ISSUER,
+        algorithms: ["RS256"]
+    })
+    console.log(payload)
+    // asset
+    if (payload.asset_access?.platform === "unic2") {
+        const assetId = payload.client_id || payload.sub || payload.preferred_username
+        return { type: "asset", id: assetId }
     }
 
-    const clientId = decoded.client_id
-    const username = decoded.preferred_username
-
-    if (clientId && clientId.startsWith("test-device-")) {
-        return { type: "asset", id: clientId}
+    // opUser
+    if (payload.opUser_access?.platform === "unic2") {
+        const userId = payload.preferred_username || payload.sub
+        return { type: "opUser", id: userId }
     }
 
-    if (username) {
-        return { type: "opUser", id: username}
-    }
-
-    throw new Error("Cannot determine role from token")
+    throw new Error("Unknown identity type")
 }
 
 const server = http.createServer()
-const wss = new WebSocket.Server({ noServer: true })
+const wss = new WebSocketServer({ noServer: true });
 
 wss.on("connection", (ws, req, identityInfo) => {
     ws.identityInfo=identityInfo;
@@ -125,21 +128,29 @@ function handleAssetMessage(assetId, ws, msg) {
     // later: publish update:asset:<id> to Redis
 }
 
-server.on("upgrade", (req, socket, head) => {
+server.on("upgrade", async (req, socket, head) => {
     let identityInfo
     try {
-        identityInfo = authenticateAndIdentify(req)
+        identityInfo = await authenticateAndIdentify(req)
+        wss.handleUpgrade(req, socket, head, ws => {
+            wss.emit("connection", ws, req, identityInfo)
+        })
     } catch (err) {
         console.error("Auth failed:", err.message)
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
         socket.destroy()
         return
     }
-
-    wss.handleUpgrade(req, socket, head, ws => {
-        wss.emit("connection", ws, req, identityInfo)
-    })
 })
+
+//health is for loadbalancer target group health check
+server.on("request", (req, res) => {
+    if (req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("OK");
+        return;
+    }
+});
 
 server.listen(PORT, () => {
     console.log(`Asset WS backend listening on port ${PORT}`)

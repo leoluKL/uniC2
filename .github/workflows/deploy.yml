@@ -39,7 +39,7 @@ jobs:
             fi
 
             # ===== prepare DeviceManagement Backend service =====
-            cd DeviceManagement
+            cd /opt/UNIC2/DeviceManagement
             npm ci --omit=dev
 
             # write /etc/devicemanagement.env
@@ -75,6 +75,42 @@ jobs:
             EOF
             # =====end of prepare DeviceManagement Backend service =====
 
+            # ===== WS Backend =====
+            cd /opt/UNIC2/unic2_ws_backend
+            npm ci --omit=dev
+
+            # write /etc/wsbackend.env
+            sudo bash -c "cat >/etc/wsbackend.env" << 'EOF'
+            KEYCLOAK_URL=https://unic2keycloak.stenmss.org
+            KEYCLOAK_REALM=unic2
+            PORT=8082
+            EOF
+            sudo chown root:root /etc/wsbackend.env
+            sudo chmod 600 /etc/wsbackend.env
+
+            # write wsbackend.service
+            sudo bash -c "cat >/etc/systemd/system/wsbackend.service" << 'EOF'
+            [Unit]
+            Description=Unic2 WS Backend
+            After=network.target
+
+            [Service]
+            Type=simple
+            User=ubuntu
+            WorkingDirectory=/opt/UNIC2/unic2_ws_backend
+            EnvironmentFile=/etc/wsbackend.env
+            ExecStart=/usr/bin/node server.js
+            Restart=always
+            RestartSec=5
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+            # =====end of prepare DeviceManagement Backend service =====
+
+
             sudo systemctl daemon-reload
             sudo systemctl enable devicemanagement.service
             sudo systemctl restart devicemanagement.service
+            sudo systemctl enable wsbackend.service
+            sudo systemctl restart wsbackend.service
