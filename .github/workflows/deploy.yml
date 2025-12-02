@@ -38,13 +38,16 @@ jobs:
               git reset --hard origin/main
             fi
 
-            # ===== DeviceManagement Backend =====
+            # ===== prepare DeviceManagement Backend service =====
             cd DeviceManagement
             npm ci --omit=dev
 
             # write /etc/devicemanagement.env
             sudo bash -c "cat >/etc/devicemanagement.env" << 'EOF'
             KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
+            KEYCLOAK_URL=https://unic2keycloak.stenmss.org
+            KEYCLOAK_REALM=unic2
+            KEYCLOAK_CLIENT_ID=unic2-devicemanagement-backend
             NODE_ENV=production
             PORT=8081
             EOF
@@ -69,6 +72,7 @@ jobs:
             [Install]
             WantedBy=multi-user.target
             EOF
+            # =====end of prepare DeviceManagement Backend service =====
 
             sudo systemctl daemon-reload
             sudo systemctl enable devicemanagement.service

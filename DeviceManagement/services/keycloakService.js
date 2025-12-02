@@ -2,9 +2,9 @@ import 'dotenv/config'
 import * as jose from 'jose'
 import crypto from "crypto"
 
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'https://unic2keycloak.stenmss.org'
-const REALM = process.env.KEYCLOAK_REALM || 'unic2'
-const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || 'unic2-devicemanagement-backend'
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL
+const REALM = process.env.KEYCLOAK_REALM
+const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID
 const CLIENT_SECRET = process.env.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET
 
 let UNIC2_ASSET_SCOPE_ID = null
