@@ -7,7 +7,8 @@ sdk.init(
     realm="unic2",
     assetId="test-device-001",
     assetSecret="7968acd48eb2730877f363f50e98b0c41887b641149884d4",
-    wsServiceUrl="ws://localhost:8082"
+    wsServiceUrl="wss://unic2ws.stenmss.org"
+    # wsServiceUrl="ws://localhost:8082"
 )
 
 # prevent script from exiting

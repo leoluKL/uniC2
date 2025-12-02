@@ -110,6 +110,8 @@ jobs:
 
 
             sudo systemctl daemon-reload
+
+            # to view log in the ec2 instance, example command is : journalctl -u wsbackend -f
             sudo systemctl enable devicemanagement.service
             sudo systemctl restart devicemanagement.service
             sudo systemctl enable wsbackend.service

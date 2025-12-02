@@ -3,11 +3,14 @@ import 'dotenv/config'
 import http from "http";
 import { WebSocketServer } from "ws";
 import * as jose from "jose";
+import { createClient } from "redis";
+
 
 const KEYCLOAK_URL = process.env.KEYCLOAK_URL
 const REALM = process.env.KEYCLOAK_REALM
 const ISSUER = `${KEYCLOAK_URL}/realms/${REALM}`
 const JWKS = jose.createRemoteJWKSet(new URL(`${ISSUER}/protocol/openid-connect/certs`))
+const REDIS_URL= process.env.REDIS_URL
 
 const PORT = process.env.PORT
 
@@ -15,6 +18,19 @@ const PORT = process.env.PORT
 const asset_ws_map = new Map()          
 const opUser_ws_map = new Map()         
 const opUser_subscribedAssets_map = new Map()      
+
+//connect redis service
+const redis = createClient({
+  url: REDIS_URL,
+  socket: {
+    reconnectStrategy: () => 2000   // retry every 2s forever
+  }
+});
+
+redis.on("error", err => console.error("Redis error:", err));
+redis.on("reconnecting", () => console.log("Redis reconnecting..."));
+await redis.connect();
+
 
 // Keycloak JWKS verification
 async function authenticateAndIdentify(req) {
