@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from "express"
 import deviceRoutes from "./routes/deviceRoutes.js"
 import cors from "cors"
@@ -7,7 +8,7 @@ const app = express()
 app.use(express.json())
 await initKeycloakCache()        // <-- run once on startup
 
-// ✅ Allow defined origins but handle missing origin safely
+// Allow defined origins but handle missing origin safely
 const allowedOrigins = ["http://localhost:5173", "https://unic2.stenmss.org"]
 
 const corsOptions = {
@@ -24,7 +25,7 @@ const corsOptions = {
   credentials: true
 }
 
-// ✅ Handle all CORS preflights explicitly
+// Handle all CORS preflights explicitly
 app.use(cors(corsOptions))
 
 // Routes

@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import * as jose from 'jose'
 import crypto from "crypto"
 
