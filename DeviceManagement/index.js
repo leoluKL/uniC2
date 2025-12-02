@@ -9,7 +9,9 @@ app.use(express.json())
 await initKeycloakCache()        // <-- run once on startup
 
 // Allow defined origins but handle missing origin safely
-const allowedOrigins = ["http://localhost:5173", "https://unic2.stenmss.org"]
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+  : [];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -36,5 +38,5 @@ app.get("/", (req, res) => {
   res.send("DeviceManagement API is running")
 })
 
-const PORT = process.env.PORT || 8081
+const PORT = process.env.PORT
 app.listen(PORT, () => console.log(`DeviceManagement API running on ${PORT}`))
