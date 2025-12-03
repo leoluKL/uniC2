@@ -29,6 +29,7 @@ const redis = createClient({
 
 redis.on("error", err => console.error("Redis error:", err));
 redis.on("reconnecting", () => console.log("Redis reconnecting..."));
+redis.on("ready", () => console.log("Redis connection is ready..."));
 await redis.connect();
 
 
