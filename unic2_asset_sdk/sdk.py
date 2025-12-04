@@ -29,5 +29,5 @@ class unic2AssetSdk:
         if not self.wsClient:
             print("WS client not initialized")
             return
-        message = {"type": "update", "data": payload}
+        message =payload
         self.wsClient.send(json.dumps(message))

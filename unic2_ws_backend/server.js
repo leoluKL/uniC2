@@ -17,20 +17,48 @@ const PORT = process.env.PORT
 // In-memory connection & subscription registry
 const asset_ws_map = new Map()          
 const opUser_ws_map = new Map()         
-const opUser_subscribedAssets_map = new Map()      
+const opUser_monitorAssets_map = new Map()      
 
 //connect redis service
-const redis = createClient({
+const redisPub = createClient({
+  url: REDIS_URL,
+  socket: {
+    reconnectStrategy: () => 2000   // retry every 2s forever
+  }
+});
+const redisSub = createClient({
   url: REDIS_URL,
   socket: {
     reconnectStrategy: () => 2000   // retry every 2s forever
   }
 });
 
-redis.on("error", err => console.error("Redis error:", err));
-redis.on("reconnecting", () => console.log("Redis reconnecting..."));
-redis.on("ready", () => console.log("Redis connection is ready..."));
-await redis.connect();
+
+redisPub.on("error", err => console.error("Redis pub client error:", err));
+redisPub.on("reconnecting", () => console.log("Redis pub client reconnecting..."));
+redisPub.on("ready", () => console.log("Redis pub client connection is ready..."));
+redisSub.on("error", err => console.error("Redis sub client error:", err));
+redisSub.on("reconnecting", () => console.log("Redis sub client reconnecting..."));
+redisSub.on("ready", () => console.log("Redis sub client connection is ready..."));
+await redisPub.connect();
+await redisSub.connect();
+await redisSub.pSubscribe("cmd:asset:*", (message, channel) => {
+  const assetId = channel.split(":")[2];
+  const assetWs = asset_ws_map.get(assetId);
+  if (assetWs && assetWs.readyState === 1) {
+    assetWs.send({"type":"opCommand",payload:message});
+  }
+});
+await redisSub.pSubscribe("update:asset:*", (message, channel) => {
+  const assetId = channel.split(":")[2];
+
+  opUser_ws_map.forEach((ws, opUserId) => {
+    const monitorAssets = opUser_monitorAssets_map.get(opUserId);
+    if (monitorAssets && monitorAssets.has(assetId) && ws.readyState === 1) {
+      ws.send(JSON.stringify({ "type":"assetUpdate", asset: assetId, payload: JSON.parse(message) }));
+    }
+  });
+});
 
 
 // Keycloak JWKS verification
@@ -42,7 +70,7 @@ async function authenticateAndIdentify(req) {
         issuer: ISSUER,
         algorithms: ["RS256"]
     })
-    console.log(payload)
+    //console.log(payload)
     // asset
     if (payload.asset_access?.platform === "unic2") {
         const assetId = payload.client_id || payload.sub || payload.preferred_username
@@ -68,7 +96,7 @@ wss.on("connection", (ws, req, identityInfo) => {
         console.log(`Asset connected: ${identityInfo.id}`)
     } else if (identityInfo.type === "opUser") {
         opUser_ws_map.set(identityInfo.id, ws)
-        if (!opUser_subscribedAssets_map.has(identityInfo.id)) opUser_subscribedAssets_map.set(identityInfo.id, new Set())
+        if (!opUser_monitorAssets_map.has(identityInfo.id)) opUser_monitorAssets_map.set(identityInfo.id, new Set())
         console.log(`opUser connected: ${identityInfo.id}`)
     }
 
@@ -90,7 +118,7 @@ wss.on("connection", (ws, req, identityInfo) => {
             // later: publish update:asset:<id> { __system: "offline" }
         } else if (identityInfo.type === "opUser") {
             opUser_ws_map.delete(identityInfo.id)
-            opUser_subscribedAssets_map.delete(identityInfo.id)
+            opUser_monitorAssets_map.delete(identityInfo.id)
             console.log(`opUser disconnected: ${identityInfo.id}`)
         }
     })
@@ -98,18 +126,18 @@ wss.on("connection", (ws, req, identityInfo) => {
 
 function handleOpUserMessage(opUserId, ws, msg) {
     if (msg.subscribe && Array.isArray(msg.subscribe)) {
-        const subscribedAssets = opUser_subscribedAssets_map.get(opUserId) || new Set()
-        msg.subscribe.forEach(id => subscribedAssets.add(id))
-        opUser_subscribedAssets_map.set(opUserId, subscribedAssets)
-        console.log(`opUser ${opUserId} subscribed to`, Array.from(subscribedAssets))
+        const monitorAssets = opUser_monitorAssets_map.get(opUserId) || new Set()
+        msg.subscribe.forEach(id => monitorAssets.add(id))
+        opUser_monitorAssets_map.set(opUserId, monitorAssets)
+        console.log(`opUser ${opUserId} subscribed to`, Array.from(monitorAssets))
         return
     }
 
     if (msg.unsubscribe && Array.isArray(msg.unsubscribe)) {
-        const subscribedAssets = opUser_subscribedAssets_map.get(opUserId)
-        if (subscribedAssets) {
-            msg.unsubscribe.forEach(id => subscribedAssets.delete(id))
-            console.log(`opUser ${opUserId} subscriptions now`, Array.from(subscribedAssets))
+        const monitorAssets = opUser_monitorAssets_map.get(opUserId)
+        if (monitorAssets) {
+            msg.unsubscribe.forEach(id => monitorAssets.delete(id))
+            console.log(`opUser ${opUserId} subscriptions now`, Array.from(monitorAssets))
         }
         return
     }
@@ -133,13 +161,16 @@ function handleOpUserMessage(opUserId, ws, msg) {
     // ignore unknown opUser messages for now
 }
 
-function handleAssetMessage(assetId, ws, msg) {
+async function handleAssetMessage(assetId, ws, msg) {
+    await redisPub.publish(`update:asset:${assetId}`, JSON.stringify(msg))
+    /*
     opUser_ws_map.forEach((opUserWs, opUserId) => {
-        const subscribedAssets = opUser_subscribedAssets_map.get(opUserId)
-        if (subscribedAssets && subscribedAssets.has(assetId) && opUserWs.readyState === WebSocket.OPEN) {
+        const monitorAssets = opUser_monitorAssets_map.get(opUserId)
+        if (monitorAssets && monitorAssets.has(assetId) && opUserWs.readyState === WebSocket.OPEN) {
             opUserWs.send(JSON.stringify({ "asset":assetId, payload: msg }))
         }
     })
+    */
 
     console.log(`Update from asset ${assetId}`, msg)
     // later: publish update:asset:<id> to Redis
