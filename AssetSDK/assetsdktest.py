@@ -1,4 +1,4 @@
-from unic2_asset_sdk.sdk import unic2AssetSdk
+from unic2_asset_sdk import unic2AssetSdk
 import time
 
 sdk = unic2AssetSdk()
