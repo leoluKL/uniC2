@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - "unic2_ws_backend/**"
+      - ".github/workflows/deploy-wsbackend.yml"
 
 jobs:
   deploy:

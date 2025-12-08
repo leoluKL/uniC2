@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - "DeviceManagement/**"
+      - ".github/workflows/deploy-assetmanagement.yml"
 
 jobs:
   deploy:
