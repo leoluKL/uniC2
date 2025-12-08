@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - "unic2_opUser_admin/**"
+      - ".github/workflows/deploy-opuseradmin.yml"
 
 jobs:
   deploy:
