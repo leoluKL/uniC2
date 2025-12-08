@@ -45,7 +45,7 @@ jobs:
             KEYCLOAK_REALM=unic2
             KEYCLOAK_CLIENT_ID=unic2-devicemanagement-backend
             NODE_ENV=production
-            ALLOWED_ORIGINS=http://localhost:5173,https://unic2.stenmss.org
+            ALLOWED_ORIGINS=http://localhost:5173,https://unic2.stenmss.org,https://unic2admin.stenmss.org
             PORT=8081
             EOF
 
