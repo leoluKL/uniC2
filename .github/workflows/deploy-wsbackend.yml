@@ -1,0 +1,66 @@
+name: Deploy WS Backend
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "unic2_ws_backend/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - host: EC2_A
+            key: EC2_SSH_KEY
+          - host: EC2_B
+            key: EC2_SSH_KEY
+
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets[matrix.target.host] }}
+          username: ubuntu
+          key: ${{ secrets[matrix.target.key] }}
+          script: |
+            sudo mkdir -p /opt/UNIC2
+            sudo chown ubuntu:ubuntu /opt/UNIC2
+            cd /opt/UNIC2
+
+            if [ ! -d .git ]; then
+              git clone https://github.com/leoluKL/uniC2.git .
+            else
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            cd unic2_ws_backend
+            npm ci --omit=dev
+
+            sudo bash -c "cat >/etc/wsbackend.env" << 'EOF'
+            KEYCLOAK_URL=https://unic2keycloak.stenmss.org
+            KEYCLOAK_REALM=unic2
+            REDIS_URL=rediss://unic2wsnetwork-yg5zfi.serverless.apse1.cache.amazonaws.com:6379
+            PORT=8082
+            EOF
+
+            sudo bash -c "cat >/etc/systemd/system/wsbackend.service" << 'EOF'
+            [Unit]
+            Description=Unic2 WS Backend
+            After=network.target
+            [Service]
+            Type=simple
+            User=ubuntu
+            WorkingDirectory=/opt/UNIC2/unic2_ws_backend
+            EnvironmentFile=/etc/wsbackend.env
+            ExecStart=/usr/bin/node server.js
+            Restart=always
+            RestartSec=5
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable wsbackend
+            sudo systemctl restart wsbackend

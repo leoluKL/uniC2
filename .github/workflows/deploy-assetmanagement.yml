@@ -1,0 +1,69 @@
+name: Deploy DeviceManagement Backend
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "DeviceManagement/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - host: EC2_A
+            key: EC2_SSH_KEY
+          - host: EC2_B
+            key: EC2_SSH_KEY
+
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets[matrix.target.host] }}
+          username: ubuntu
+          key: ${{ secrets[matrix.target.key] }}
+          script: |
+            sudo mkdir -p /opt/UNIC2
+            sudo chown ubuntu:ubuntu /opt/UNIC2
+            cd /opt/UNIC2
+
+            if [ ! -d .git ]; then
+              git clone https://github.com/leoluKL/uniC2.git .
+            else
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            cd DeviceManagement
+            npm ci --omit=dev
+
+            sudo bash -c "cat >/etc/devicemanagement.env" << 'EOF'
+            KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET=${{ secrets.KEYCLOAK_DEVICEMANAGEMENTCLIENTSECRET }}
+            KEYCLOAK_URL=https://unic2keycloak.stenmss.org
+            KEYCLOAK_REALM=unic2
+            KEYCLOAK_CLIENT_ID=unic2-devicemanagement-backend
+            NODE_ENV=production
+            ALLOWED_ORIGINS=http://localhost:5173,https://unic2.stenmss.org
+            PORT=8081
+            EOF
+
+            sudo bash -c "cat >/etc/systemd/system/devicemanagement.service" << 'EOF'
+            [Unit]
+            Description=Unic2 DeviceManagement Backend
+            After=network.target
+            [Service]
+            Type=simple
+            User=ubuntu
+            WorkingDirectory=/opt/UNIC2/DeviceManagement
+            EnvironmentFile=/etc/devicemanagement.env
+            ExecStart=/usr/bin/node index.js
+            Restart=always
+            RestartSec=5
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable devicemanagement
+            sudo systemctl restart devicemanagement
