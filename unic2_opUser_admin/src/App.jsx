@@ -16,7 +16,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col bg-green-500 items-center justify-center min-h-screen w-screen text-green-400 text-2xl">
+    <div className="flex flex-col bg-green-500 items-center justify-center min-h-screen w-screen text-green-200 text-2xl">
       <p>{userName}</p>
 
       <div className="mt-4 flex gap-4">
