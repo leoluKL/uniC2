@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react"
-import { appConfig } from "../appConfig"
+import { useState, useEffect,useContext } from "react"
 import RegisterAssetPopup from "./RegisterAssetPopup.jsx"
-import ConfirmDialog from "../utils/ConfirmDialog"
+import ConfirmDialog from "../utils/ConfirmDialog.jsx"
+import { appConfig } from "../appConfig.js"
+import { AuthContext } from "../AuthProvider.jsx"
 
-export default function AssetsManagement({ keycloak }) {
+export default function AssetsManagement({ }) {
+    const {sdkManager} = useContext(AuthContext);
     const [assets, setAssets] = useState([])
     const [selectedAsset, setSelectedAsset] = useState(null)
     const [showPopup, setShowPopup] = useState(false)
@@ -11,11 +13,11 @@ export default function AssetsManagement({ keycloak }) {
 
     useEffect(() => {
         async function fetchAssets() {
-            if (!keycloak?.token) return
+            if (!sdkManager?.accessToken) return
             const res = await fetch(`${appConfig.assetManagementBackendUrl}/api/device/list`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${keycloak.token}`,
+                    'Authorization': `Bearer ${sdkManager?.accessToken}`,
                     'Content-Type': 'application/json'
                 }
             })
@@ -23,13 +25,13 @@ export default function AssetsManagement({ keycloak }) {
             setAssets(data)
         }
         fetchAssets()
-    }, [keycloak])
+    }, [sdkManager?.accessToken])
 
     async function downloadSecret(clientId){
         const res = await fetch(`${appConfig.assetManagementBackendUrl}/api/device/secret`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${keycloak.token}`,
+                'Authorization': `Bearer ${sdkManager?.accessToken}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ clientId })
@@ -52,7 +54,7 @@ export default function AssetsManagement({ keycloak }) {
         <div className="flex w-screen h-screen text-[14px] bg-gray-800 text-black">
             {/* Left Panel */}
             <div className="w-1/2 border-r border-black overflow-y-auto">
-                <div className="bg-green-700 text-white font-bold text-center py-3"
+                <div className="bg-green-700 text-white font-bold text-center py-3 cursor-pointer"
                     onClick={()=>{setShowPopup(true)}}
                 >
                     Register New Asset
@@ -64,7 +66,7 @@ export default function AssetsManagement({ keycloak }) {
                                 const res = await fetch(`${appConfig.assetManagementBackendUrl}/api/device/create`, {
                                     method: "POST",
                                     headers: {
-                                        "Authorization": `Bearer ${keycloak.token}`,
+                                        "Authorization": `Bearer ${sdkManager?.accessToken}`,
                                         "Content-Type": "application/json"
                                     },
                                     body: JSON.stringify({
@@ -80,7 +82,7 @@ export default function AssetsManagement({ keycloak }) {
                                 const refreshed = await fetch(`${appConfig.assetManagementBackendUrl}/api/device/list`, {
                                     method: "POST",
                                     headers: {
-                                        "Authorization": `Bearer ${keycloak.token}`,
+                                        "Authorization": `Bearer ${sdkManager?.accessToken}`,
                                         "Content-Type": "application/json"
                                     }
                                 });
@@ -147,7 +149,7 @@ export default function AssetsManagement({ keycloak }) {
                         const res = await fetch(`${appConfig.assetManagementBackendUrl}/api/device/delete`, {
                             method: "POST",
                             headers: {
-                                "Authorization": `Bearer ${keycloak.token}`,
+                                "Authorization": `Bearer ${sdkManager?.accessToken}`,
                                 "Content-Type": "application/json"
                             },
                             body: JSON.stringify({
@@ -162,7 +164,7 @@ export default function AssetsManagement({ keycloak }) {
                         const refreshed = await fetch(`${appConfig.assetManagementBackendUrl}/api/device/list`, {
                             method: "POST",
                             headers: {
-                                "Authorization": `Bearer ${keycloak.token}`,
+                                "Authorization": `Bearer ${sdkManager?.accessToken}`,
                                 "Content-Type": "application/json"
                             }
                         });

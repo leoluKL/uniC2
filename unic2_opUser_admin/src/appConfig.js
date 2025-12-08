@@ -4,4 +4,5 @@ export const appConfig = {
   keycloakUrl: "https://unic2keycloak.stenmss.org",
   appKeycloakClientId:"unic2app-frontend",
   realm: "unic2",
+  wsUrl:""
 }
