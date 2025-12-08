@@ -19,5 +19,6 @@
   },
   "dependencies": {
     "keycloak-js": "^26.2.1"
-  }
+  },
+  "publishConfig": { "access": "public" }
 }
