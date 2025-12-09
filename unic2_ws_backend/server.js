@@ -10,27 +10,27 @@ const KEYCLOAK_URL = process.env.KEYCLOAK_URL
 const REALM = process.env.KEYCLOAK_REALM
 const ISSUER = `${KEYCLOAK_URL}/realms/${REALM}`
 const JWKS = jose.createRemoteJWKSet(new URL(`${ISSUER}/protocol/openid-connect/certs`))
-const REDIS_URL= process.env.REDIS_URL
+const REDIS_URL = process.env.REDIS_URL
 
 const PORT = process.env.PORT
 
 // In-memory connection & subscription registry
-const asset_ws_map = new Map()          
-const opUser_ws_map = new Map()         
-const opUser_monitorAssets_map = new Map()      
+const asset_ws_map = new Map()
+const opUser_ws_map = new Map()
+const opUser_monitorAssets_map = new Map()
 
 //connect redis service
 const redisPub = createClient({
-  url: REDIS_URL,
-  socket: {
-    reconnectStrategy: () => 2000   // retry every 2s forever
-  }
+    url: REDIS_URL,
+    socket: {
+        reconnectStrategy: () => 2000   // retry every 2s forever
+    }
 });
 const redisSub = createClient({
-  url: REDIS_URL,
-  socket: {
-    reconnectStrategy: () => 2000   // retry every 2s forever
-  }
+    url: REDIS_URL,
+    socket: {
+        reconnectStrategy: () => 2000   // retry every 2s forever
+    }
 });
 
 
@@ -43,21 +43,21 @@ redisSub.on("ready", () => console.log("Redis sub client connection is ready..."
 await redisPub.connect();
 await redisSub.connect();
 await redisSub.pSubscribe("cmd:asset:*", (message, channel) => {
-  const assetId = channel.split(":")[2];
-  const assetWs = asset_ws_map.get(assetId);
-  if (assetWs && assetWs.readyState === 1) {
-    assetWs.send({"type":"opCommand",payload:message});
-  }
+    const assetId = channel.split(":")[2];
+    const assetWs = asset_ws_map.get(assetId);
+    if (assetWs && assetWs.readyState === 1) {
+        assetWs.send({ "type": "opCommand", payload: message });
+    }
 });
 await redisSub.pSubscribe("update:asset:*", (message, channel) => {
-  const assetId = channel.split(":")[2];
+    const assetId = channel.split(":")[2];
 
-  opUser_ws_map.forEach((ws, opUserId) => {
-    const monitorAssets = opUser_monitorAssets_map.get(opUserId);
-    if (monitorAssets && monitorAssets.has(assetId) && ws.readyState === 1) {
-      ws.send(JSON.stringify({ "type":"assetUpdate", asset: assetId, payload: JSON.parse(message) }));
-    }
-  });
+    opUser_ws_map.forEach((ws, opUserId) => {
+        const monitorAssets = opUser_monitorAssets_map.get(opUserId);
+        if (monitorAssets && monitorAssets.has(assetId) && ws.readyState === 1) {
+            ws.send(JSON.stringify({ "type": "assetUpdate", asset: assetId, payload: JSON.parse(message) }));
+        }
+    });
 });
 
 
@@ -90,11 +90,11 @@ const server = http.createServer()
 const wss = new WebSocketServer({ noServer: true });
 
 wss.on("connection", (ws, req, identityInfo) => {
-    ws.identityInfo=identityInfo;
+    ws.identityInfo = identityInfo;
     if (identityInfo.type === "asset") {
         asset_ws_map.set(identityInfo.id, ws)
         console.log(`Asset connected: ${identityInfo.id}`)
-        redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({"online":true}))
+        redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": true }))
     } else if (identityInfo.type === "opUser") {
         opUser_ws_map.set(identityInfo.id, ws)
         if (!opUser_monitorAssets_map.has(identityInfo.id)) opUser_monitorAssets_map.set(identityInfo.id, new Set())
@@ -116,7 +116,7 @@ wss.on("connection", (ws, req, identityInfo) => {
         if (identityInfo.type === "asset") {
             asset_ws_map.delete(identityInfo.id)
             console.log(`Asset disconnected: ${identityInfo.id}`)
-            redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({"online":false}))
+            redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": false }))
         } else if (identityInfo.type === "opUser") {
             opUser_ws_map.delete(identityInfo.id)
             opUser_monitorAssets_map.delete(identityInfo.id)
