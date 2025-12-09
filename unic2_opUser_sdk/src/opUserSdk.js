@@ -1,5 +1,6 @@
 // src/opUserSdk.js
 import Keycloak from 'keycloak-js'
+import WsClient from './core/wsClient';
 
 export default class unic2OpUserSdk {
     static instance = null;
@@ -49,6 +50,13 @@ export default class unic2OpUserSdk {
             });
         }, 10000);
 
+        if (this.wsUrl) {
+            this.wsClient = new WsClient({
+                wsUrl: this.wsUrl,
+                getTokenFn: () => this.accessToken,
+                parent: this
+            });
+        }
         return true;
     }
 

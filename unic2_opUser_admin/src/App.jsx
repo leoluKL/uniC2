@@ -8,6 +8,7 @@ export default function App() {
   const {sdkManager} = useContext(AuthContext);
 
   useEffect(() => {  
+    //console.log(sdkManager.kc.token)
     setUserName(sdkManager.kc.tokenParsed?.preferred_username )
   }, []);
 
