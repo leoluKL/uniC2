@@ -1,10 +1,9 @@
 export default class WsClient {
-    constructor({ wsUrl, getTokenFn, parent, 
-                  initialDelayMs = 1000, maxDelayMs = 30000 }) {
+    constructor({ wsUrl, getTokenFn, onMsgCallback,onWebSocketConnected,onWebSocketDisconnected, 
+        initialDelayMs = 1000, maxDelayMs = 30000 }) {
 
         this.wsUrl = wsUrl
         this.getTokenFn = getTokenFn        // must return fresh token
-        this.parent = parent
 
         this.ws = null
 
@@ -14,6 +13,10 @@ export default class WsClient {
         this.currentDelayMs = initialDelayMs
         this._shouldReconnect = true
         this._timer = null
+
+        this.onMsgCallback=onMsgCallback;
+        this.onWebSocketConnected=onWebSocketConnected;
+        this.onWebSocketDisconnected=onWebSocketDisconnected;
 
         this._connect()
     }
@@ -27,19 +30,19 @@ export default class WsClient {
 
             this.ws.onopen = () => {
                 this.currentDelayMs = this.initialDelayMs     // reset backoff
+                this.onWebSocketConnected();
             }
 
             this.ws.onmessage = evt => {
                 let msg
                 try { msg = JSON.parse(evt.data) } catch { return }
-                if (this.parent?._onWSRecivedMsg) {
-                    this.parent._onWSRecivedMsg(msg)
-                }
+                this.onMsgCallback(msg)
             }
 
             this.ws.onclose = () => {
                 this.ws = null
                 if (this._shouldReconnect) this._scheduleReconnect()
+                this.onWebSocketDisconnected()
             }
 
             this.ws.onerror = () => {

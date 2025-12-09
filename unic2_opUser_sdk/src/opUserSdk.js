@@ -25,6 +25,9 @@ export default class unic2OpUserSdk {
         this.accessToken = null;
         this.refreshToken = null;
 
+        this.onWebSocketConnected=()=>{} //NOTE: developer should use this one to subscribe Asset interests again as the new setup websocket maybe not in the same backend node
+        this.onWebSocketDisconnected=()=>{}
+
         this.readyPromise = this._initLogin();
 
         unic2OpUserSdk.instance = this;
@@ -54,11 +57,43 @@ export default class unic2OpUserSdk {
             this.wsClient = new WsClient({
                 wsUrl: this.wsUrl,
                 getTokenFn: () => this.accessToken,
-                parent: this
+                onMsgCallback: (msg)=>{this._onWSRecivedMsg(msg)},
+                onWebSocketConnected: ()=>{this.onWebSocketConnected()},
+                onWebSocketDisconnected: ()=>{this.onWebSocketDisconnected()}
             });
         }
         return true;
     }
+
+    sendCommandToAsset(assetId,payload) {
+        if (!this.wsClient) {
+            console.error("WS not connected");
+            return false;
+        }
+        this.wsClient.send({"toAsset":assetId,payload});
+        return true;
+    }
+
+    subscribeAsset(assetArr) {
+        if (!this.wsClient) {
+            console.error("WS not connected");
+            return false;
+        }
+        this.wsClient.send({
+            "subscribe":assetArr
+        });
+    }
+
+    unsubscribeAsset(assetArr) {
+        if (!this.wsClient) {
+            console.error("WS not connected");
+            return false;
+        }
+        this.wsClient.send({
+            "unsubscribe":assetArr
+        });
+    }
+
 
     setOnAssetUpdate(fn) {
         this.onAssetUpdate = fn
@@ -70,6 +105,18 @@ export default class unic2OpUserSdk {
 
     setOnAssetOffline(fn) {
         this.onAssetOffline = fn
+    }
+
+    getCommandIOStatus(){
+        if(this.wsClient?.ws) return true
+        else return false
+    }
+
+    setOnCommandIOConnected(fn){
+        this.onWebSocketConnected = fn
+    }
+    setOnCommandIODisconnected(fn){
+        this.onWebSocketDisconnected = fn
     }
 
     _onWSRecivedMsg(msg) {
