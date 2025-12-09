@@ -94,7 +94,7 @@ wss.on("connection", (ws, req, identityInfo) => {
     if (identityInfo.type === "asset") {
         asset_ws_map.set(identityInfo.id, ws)
         console.log(`Asset connected: ${identityInfo.id}`)
-        redisPub.publish(`update:asset:${identityInfo.id}`, {"online":true})
+        redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({"online":true}))
     } else if (identityInfo.type === "opUser") {
         opUser_ws_map.set(identityInfo.id, ws)
         if (!opUser_monitorAssets_map.has(identityInfo.id)) opUser_monitorAssets_map.set(identityInfo.id, new Set())
@@ -116,7 +116,7 @@ wss.on("connection", (ws, req, identityInfo) => {
         if (identityInfo.type === "asset") {
             asset_ws_map.delete(identityInfo.id)
             console.log(`Asset disconnected: ${identityInfo.id}`)
-            redisPub.publish(`update:asset:${identityInfo.id}`, {"online":false})
+            redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({"online":false}))
         } else if (identityInfo.type === "opUser") {
             opUser_ws_map.delete(identityInfo.id)
             opUser_monitorAssets_map.delete(identityInfo.id)
@@ -148,7 +148,7 @@ function handleOpUserMessage(opUserId, ws, msg) {
         const payload = msg.payload
         if (!payload) return
 
-        redisPub.publish(`command:asset:${assetId}`, msg.payload)
+        redisPub.publish(`command:asset:${assetId}`, JSON.stringify(msg.payload))
         return
     }
 
