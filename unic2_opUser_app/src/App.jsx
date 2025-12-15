@@ -12,8 +12,7 @@ export default function App() {
     setUserName(sdkManager.kc.tokenParsed?.preferred_username )
 
     sdkManager.setOnCommandIOConnected(()=>{
-      console.log("command io is ready")
-      console.log(sdkManager.getCommandIOStatus())
+      console.log("Command IO communication:"+ sdkManager.getCommandIOStatus())
       //sdkManager.subscribeAsset(["test-device-001"])
     })
     sdkManager.setOnAssetOnline((assetId)=>{
@@ -23,8 +22,7 @@ export default function App() {
       console.log(assetId + " is offline")
     })
     sdkManager.setOnAssetUpdate((assetId,payload)=>{
-      console.log(assetId +" update")
-      console.log(payload)
+      console.log(assetId +" update:" + payload)
     })
   }, []);
 
