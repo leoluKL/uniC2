@@ -99,13 +99,19 @@ async function authenticateAndIdentify(req,protocol) {
 const server = http.createServer()
 const wss = new WebSocketServer({ noServer: true });
 
-wss.on("connection", (ws, req, identityInfo) => {
+wss.on("connection", async (ws, req, identityInfo) => {
     ws.identityInfo = identityInfo;
     if (identityInfo.type === "asset") {
         asset_ws_map.set(identityInfo.id, ws)
         console.log(`Asset connected: ${identityInfo.id}`)
-        redisPub.set(`asset:status:${identityInfo.id}`, JSON.stringify({ online: true, ts: Date.now() }))
-        redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": true }))
+        const theKey = `asset:status:${identityInfo.id}`
+        const [sec, micro] = await redisPub.time();
+        const redisTS = Number(sec) * 1000 + Math.floor(Number(micro) / 1000);
+        const prev = await redisPub.get(theKey);
+        if (!prev || redisTS > JSON.parse(prev).ts) {
+            redisPub.set(`asset:status:${identityInfo.id}`, JSON.stringify({ online: true, ts: redisTS }))
+            redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": true }))
+        }
     } else if (identityInfo.type === "opUser") {
         opUser_ws_map.set(identityInfo.id, ws)
         if (!opUser_monitorAssets_map.has(identityInfo.id)) opUser_monitorAssets_map.set(identityInfo.id, new Set())
@@ -123,13 +129,19 @@ wss.on("connection", (ws, req, identityInfo) => {
         }
     })
 
-    ws.on("close", () => {
+    ws.on("close", async () => {
         if (identityInfo.type === "asset") {
             asset_ws_map.delete(identityInfo.id)
             console.log(`Asset disconnected: ${identityInfo.id}`)
             //redisPub.hDel("assets:online", identityInfo.id)
-            redisPub.set(`asset:status:${identityInfo.id}`, JSON.stringify({ online: false, ts: Date.now() }), { EX: 30 * 24 * 3600 })
-            redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": false }))
+            const theKey=`asset:status:${identityInfo.id}`
+            const [sec, micro] = await redisPub.time();
+            const redisTS = Number(sec) * 1000 + Math.floor(Number(micro) / 1000);
+            const prev = await redisPub.get(theKey);
+            if (!prev || redisTS > JSON.parse(prev).ts) {
+                redisPub.set(theKey, JSON.stringify({ online: false, ts: redisTS }), { EX: 30 * 24 * 3600 })
+                redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": false }))
+            }
         } else if (identityInfo.type === "opUser") {
             opUser_ws_map.delete(identityInfo.id)
             opUser_monitorAssets_map.delete(identityInfo.id)
@@ -206,15 +218,23 @@ server.on("request", async (req, res) => {
             return;
         }
 
-        const keys = await redisPub.keys("asset:status:*");
         const result = {};
+        let cursor = "0";
 
-        for (const key of keys) {
-            const val = await redisPub.get(key);
-            if (!val) continue;
-            const assetId = key.split(":")[2];
-            result[assetId] = JSON.parse(val);
-        }
+        do {
+            const [next, keys] = await redisPub.scan(cursor, {
+                MATCH: "asset:status:*",
+                COUNT: 100
+            });
+            cursor = next;
+
+            for (const key of keys) {
+                const val = await redisPub.get(key);
+                if (!val) continue;
+                const assetId = key.split(":")[2];
+                result[assetId] = JSON.parse(val);
+            }
+        } while (cursor !== "0");
 
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
