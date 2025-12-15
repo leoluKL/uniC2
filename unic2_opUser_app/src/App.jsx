@@ -22,7 +22,7 @@ export default function App() {
       console.log(assetId + " is offline")
     })
     sdkManager.setOnAssetUpdate((assetId,payload)=>{
-      console.log(assetId +" update:" + payload)
+      console.log(assetId +" update:" + JSON.stringify(payload))
     })
   }, []);
 
