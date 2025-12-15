@@ -25,7 +25,7 @@ class WsClient:
         print("[WS] closed")
 
 
-    def _connect_with_timeout(self, timeout_sec=30):
+    def _connect(self):
         token = self.getTokenFn()
         self.ws = websocket.WebSocketApp(
             self.wsServiceUrl,
@@ -34,29 +34,8 @@ class WsClient:
             on_open=self._on_open,
             on_close=self._on_close,
         )
-        """
-        Run ws.run_forever() in a helper thread and force-return if it hangs.
-        """
 
-        def _runner():
-            try:
-                self.ws.run_forever(ping_interval=20, ping_timeout=10)
-            except Exception as e:
-                print("[WS] run_forever error:", e)
-
-        t = threading.Thread(target=_runner, daemon=True)
-        t.start()
-        t.join(timeout_sec)
-
-        if t.is_alive():
-            print("[WS] run_forever timeout -> forcing reconnect")
-            # mark connection as dead
-            self.connected = False
-            # Note: websocket-client has no safe 'stop'; we close socket forcibly:
-            try:
-                self.ws.close()
-            except:
-                pass
+        self.ws.run_forever(ping_interval=20, ping_timeout=10)
 
     def _run_forever(self):
         backoff = 1 
@@ -64,7 +43,7 @@ class WsClient:
         while not self._stop_flag:
             if not self.connected:
                 try:
-                    self._connect_with_timeout()
+                    self._connect()
                 except Exception as e:
                     print("[WS] connect error:", e)
                 time.sleep(backoff)
