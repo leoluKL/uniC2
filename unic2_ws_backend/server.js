@@ -94,6 +94,7 @@ wss.on("connection", (ws, req, identityInfo) => {
     if (identityInfo.type === "asset") {
         asset_ws_map.set(identityInfo.id, ws)
         console.log(`Asset connected: ${identityInfo.id}`)
+        redisPub.hSet("assets:online", identityInfo.id, "1")
         redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": true }))
     } else if (identityInfo.type === "opUser") {
         opUser_ws_map.set(identityInfo.id, ws)
@@ -116,6 +117,8 @@ wss.on("connection", (ws, req, identityInfo) => {
         if (identityInfo.type === "asset") {
             asset_ws_map.delete(identityInfo.id)
             console.log(`Asset disconnected: ${identityInfo.id}`)
+            //redisPub.hDel("assets:online", identityInfo.id)
+            redisPub.hSet("assets:online", identityInfo.id, "0")
             redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": false }))
         } else if (identityInfo.type === "opUser") {
             opUser_ws_map.delete(identityInfo.id)

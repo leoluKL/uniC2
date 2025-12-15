@@ -14,7 +14,7 @@ export default function App() {
     sdkManager.setOnCommandIOConnected(()=>{
       console.log("command io is ready")
       console.log(sdkManager.getCommandIOStatus())
-      sdkManager.subscribeAsset(["test-device-001"])
+      //sdkManager.subscribeAsset(["test-device-001"])
     })
     sdkManager.setOnAssetOnline((assetId)=>{
       console.log(assetId + " is online")
