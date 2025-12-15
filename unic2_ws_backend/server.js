@@ -62,10 +62,20 @@ await redisSub.pSubscribe("update:asset:*", (message, channel) => {
 
 
 // Keycloak JWKS verification
-async function authenticateAndIdentify(req) {
-    const protoHeader = req.headers["sec-websocket-protocol"]
-    if (!protoHeader) throw new Error("Missing Sec-WebSocket-Protocol")
-    const token = protoHeader.split(",")[0].trim()
+async function authenticateAndIdentify(req,protocol) {
+    let token = null;
+    if (protocol == "ws") {
+        const protoHeader = req.headers["sec-websocket-protocol"]
+        if (!protoHeader) throw new Error("Missing Sec-WebSocket-Protocol")
+        token = protoHeader.split(",")[0].trim()
+    } else if (protocol == "http") {
+        const auth = req.headers["authorization"];
+        if (!auth || !auth.startsWith("Bearer ")) {
+            throw new Error("Missing Authorization");
+        }
+        token = auth.slice(7);
+    }
+    
     const { payload } = await jose.jwtVerify(token, JWKS, {
         issuer: ISSUER,
         algorithms: ["RS256"]
@@ -167,7 +177,7 @@ async function handleAssetMessage(assetId, ws, msg) {
 server.on("upgrade", async (req, socket, head) => {
     let identityInfo
     try {
-        identityInfo = await authenticateAndIdentify(req)
+        identityInfo = await authenticateAndIdentify(req,"ws")
         wss.handleUpgrade(req, socket, head, ws => {
             wss.emit("connection", ws, req, identityInfo)
         })
@@ -188,6 +198,14 @@ server.on("request", async (req, res) => {
     }
 
     if (req.url === "/assetsOnlineStatus") {
+        try {
+            await authenticateAndIdentify(req, "http")
+        } catch (err) {
+            res.writeHead(401);
+            res.end("Unauthorized");
+            return;
+        }
+
         const keys = await redisPub.keys("asset:status:*");
         const result = {};
 
