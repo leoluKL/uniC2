@@ -46,16 +46,16 @@ await redisSub.pSubscribe("cmd:asset:*", (message, channel) => {
     const assetId = channel.split(":")[2];
     const assetWs = asset_ws_map.get(assetId);
     if (assetWs && assetWs.readyState === 1) {
-        assetWs.send({ "type": "opCommand", payload: message });
+        assetWs.send(JSON.stringify({ type: "opCommand", payload: JSON.parse(message) }))
     }
 });
 await redisSub.pSubscribe("update:asset:*", (message, channel) => {
     const assetId = channel.split(":")[2];
 
-    opUser_ws_map.forEach((ws, opUserId) => {
+    opUser_ws_map.forEach((opUserWs, opUserId) => {
         const monitorAssets = opUser_monitorAssets_map.get(opUserId);
-        if (monitorAssets && monitorAssets.has(assetId) && ws.readyState === 1) {
-            ws.send(JSON.stringify({ "type": "assetUpdate", asset: assetId, payload: JSON.parse(message) }));
+        if (monitorAssets && monitorAssets.has(assetId) && opUserWs.readyState === 1) {
+            opUserWs.send(JSON.stringify({ "type": "assetUpdate", asset: assetId, payload: JSON.parse(message) }));
         }
     });
 });
@@ -94,7 +94,7 @@ wss.on("connection", (ws, req, identityInfo) => {
     if (identityInfo.type === "asset") {
         asset_ws_map.set(identityInfo.id, ws)
         console.log(`Asset connected: ${identityInfo.id}`)
-        redisPub.hSet("assets:online", identityInfo.id, "1")
+        redisPub.set(`asset:status:${identityInfo.id}`, JSON.stringify({ online: true, ts: Date.now() }))
         redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": true }))
     } else if (identityInfo.type === "opUser") {
         opUser_ws_map.set(identityInfo.id, ws)
@@ -118,7 +118,7 @@ wss.on("connection", (ws, req, identityInfo) => {
             asset_ws_map.delete(identityInfo.id)
             console.log(`Asset disconnected: ${identityInfo.id}`)
             //redisPub.hDel("assets:online", identityInfo.id)
-            redisPub.hSet("assets:online", identityInfo.id, "0")
+            redisPub.set(`asset:status:${identityInfo.id}`, JSON.stringify({ online: false, ts: Date.now() }), { EX: 30 * 24 * 3600 })
             redisPub.publish(`update:asset:${identityInfo.id}`, JSON.stringify({ "online": false }))
         } else if (identityInfo.type === "opUser") {
             opUser_ws_map.delete(identityInfo.id)
@@ -151,7 +151,7 @@ function handleOpUserMessage(opUserId, ws, msg) {
         const payload = msg.payload
         if (!payload) return
 
-        redisPub.publish(`command:asset:${assetId}`, JSON.stringify(msg.payload))
+        redisPub.publish(`cmd:asset:${assetId}`, JSON.stringify(msg.payload))
         return
     }
 
@@ -160,15 +160,6 @@ function handleOpUserMessage(opUserId, ws, msg) {
 
 async function handleAssetMessage(assetId, ws, msg) {
     await redisPub.publish(`update:asset:${assetId}`, JSON.stringify(msg))
-    /*
-    opUser_ws_map.forEach((opUserWs, opUserId) => {
-        const monitorAssets = opUser_monitorAssets_map.get(opUserId)
-        if (monitorAssets && monitorAssets.has(assetId) && opUserWs.readyState === WebSocket.OPEN) {
-            opUserWs.send(JSON.stringify({ "asset":assetId, payload: msg }))
-        }
-    })
-    */
-
     console.log(`Update from asset ${assetId}`, msg)
     // later: publish update:asset:<id> to Redis
 }
@@ -189,10 +180,26 @@ server.on("upgrade", async (req, socket, head) => {
 })
 
 //health is for loadbalancer target group health check
-server.on("request", (req, res) => {
+server.on("request", async (req, res) => {
     if (req.url === "/health") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("OK");
+        return;
+    }
+
+    if (req.url === "/assetsOnlineStatus") {
+        const keys = await redisPub.keys("asset:status:*");
+        const result = {};
+
+        for (const key of keys) {
+            const val = await redisPub.get(key);
+            if (!val) continue;
+            const assetId = key.split(":")[2];
+            result[assetId] = JSON.parse(val);
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
         return;
     }
 });
