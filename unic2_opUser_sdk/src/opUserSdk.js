@@ -10,6 +10,10 @@ export default class unic2OpUserSdk {
             return unic2OpUserSdk.instance;
         }
 
+        this.onAssetOnline = null;
+        this.onAssetOffline = null;
+        this.onAssetUpdate = null;
+
         // first time only
         this.authUrl = config.authUrl;
         this.clientId = config.clientId;
@@ -46,7 +50,9 @@ export default class unic2OpUserSdk {
 
         // auto refresh
         setInterval(() => {
-            this.kc.updateToken(30).then(refreshed => {
+            this.kc.updateToken(30)
+            .catch(() => this.kc.login())
+            .then(refreshed => {
                 if (refreshed) {
                     this.accessToken = this.kc.token;
                 }
@@ -54,15 +60,36 @@ export default class unic2OpUserSdk {
         }, 10000);
 
         if (this.wsUrl) {
+            this.wsInitDonePromise = new Promise(res => {
+                this._resolveWsReady = res;
+            });
             this.wsClient = new WsClient({
                 wsUrl: this.wsUrl,
                 getTokenFn: () => this.accessToken,
                 onMsgCallback: (msg)=>{this._onWSRecivedMsg(msg)},
-                onWebSocketConnected: ()=>{this.onWebSocketConnected()},
+                onWebSocketConnected: ()=>{
+                    this.onWebSocketConnected()
+                    if (this._resolveWsReady) {
+                        this._resolveWsReady();
+                        this._resolveWsReady = null;
+                    }
+                },
                 onWebSocketDisconnected: ()=>{this.onWebSocketDisconnected()}
             });
+            await this.wsInitDonePromise
         }
         return true;
+    }
+
+    async getCurrentAssetsOnlineStatus() {
+        await this.readyPromise;
+        const res = await fetch("/assetsOnlineStatus", {
+            headers: {
+                Authorization: `Bearer ${this.accessToken}`
+            }
+        });
+        if (!res.ok) throw new Error("fetch assetsOnlineStatus failed");
+        return await res.json();
     }
 
     sendCommandToAsset(assetId,payload) {
@@ -82,6 +109,7 @@ export default class unic2OpUserSdk {
         this.wsClient.send({
             "subscribe":assetArr
         });
+        return true;
     }
 
     unsubscribeAsset(assetArr) {
@@ -92,6 +120,7 @@ export default class unic2OpUserSdk {
         this.wsClient.send({
             "unsubscribe":assetArr
         });
+        return true;
     }
 
 
@@ -108,8 +137,7 @@ export default class unic2OpUserSdk {
     }
 
     getCommandIOStatus(){
-        if(this.wsClient?.ws) return true
-        else return false
+        return this.wsClient?.ws?.readyState === WebSocket.OPEN
     }
 
     setOnCommandIOConnected(fn){
