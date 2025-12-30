@@ -11,6 +11,7 @@ const REALM = process.env.KEYCLOAK_REALM
 const ISSUER = `${KEYCLOAK_URL}/realms/${REALM}`
 const JWKS = jose.createRemoteJWKSet(new URL(`${ISSUER}/protocol/openid-connect/certs`))
 const REDIS_URL = process.env.REDIS_URL
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim());
 
 const PORT = process.env.PORT
 
@@ -201,6 +202,24 @@ server.on("upgrade", async (req, socket, head) => {
     }
 })
 
+
+function addCorsHeader(req, res) {
+    const origin = req.headers.origin;
+    if (ALLOWED_ORIGINS.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type");
+        res.setHeader("Vary", "Origin");
+    }
+
+    if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return true;
+    }
+    return false;
+}
+
 //health is for loadbalancer target group health check
 server.on("request", async (req, res) => {
     if (req.url === "/health") {
@@ -210,6 +229,7 @@ server.on("request", async (req, res) => {
     }
 
     if (req.url === "/assetsOnlineStatus") {
+        if (addCorsHeader(req, res)) return;
         try {
             await authenticateAndIdentify(req, "http")
         } catch (err) {
@@ -222,13 +242,10 @@ server.on("request", async (req, res) => {
         let cursor = "0";
 
         do {
-            const [next, keys] = await redisPub.scan(cursor, {
-                MATCH: "asset:status:*",
-                COUNT: 100
-            });
-            cursor = next;
+            const reply = await redisPub.scan(cursor, { MATCH: "asset:status:*", COUNT: 100 });
+            cursor = reply.cursor;
 
-            for (const key of keys) {
+            for (const key of reply.keys) {
                 const val = await redisPub.get(key);
                 if (!val) continue;
                 const assetId = key.split(":")[2];

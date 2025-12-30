@@ -44,6 +44,7 @@ jobs:
             KEYCLOAK_REALM=unic2
             REDIS_URL=rediss://unic2wsnetwork-yg5zfi.serverless.apse1.cache.amazonaws.com:6379
             PORT=8082
+            ALLOWED_ORIGINS=http://localhost:5173,https://unic2.stenmss.org,https://unic2admin.stenmss.org
             EOF
 
             sudo bash -c "cat >/etc/systemd/system/wsbackend.service" << 'EOF'
