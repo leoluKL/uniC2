@@ -83,7 +83,8 @@ export default class unic2OpUserSdk {
 
     async getCurrentAssetsOnlineStatus() {
         await this.readyPromise;
-        const res = await fetch("/assetsOnlineStatus", {
+        const httpBaseUrl = this.wsUrl.startsWith("wss://") ? this.wsUrl.replace("wss://","https://") : this.wsUrl.replace("ws://","http://");
+        const res = await fetch(`${httpBaseUrl}/assetsOnlineStatus`, {
             headers: {
                 Authorization: `Bearer ${this.accessToken}`
             }
