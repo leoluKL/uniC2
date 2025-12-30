@@ -122,6 +122,7 @@ wss.on("connection", async (ws, req, identityInfo) => {
     ws.on("message", raw => {
         let msg
         try { msg = JSON.parse(raw.toString()) } catch { return }
+        //console.log(identityInfo.type, msg)
 
         if (identityInfo.type === "opUser") {
             handleOpUserMessage(identityInfo.id, ws, msg)
@@ -152,6 +153,7 @@ wss.on("connection", async (ws, req, identityInfo) => {
 })
 
 function handleOpUserMessage(opUserId, ws, msg) {
+    //console.log(msg)
     if (msg.subscribe && Array.isArray(msg.subscribe)) {
         const monitorAssets = opUser_monitorAssets_map.get(opUserId) || new Set()
         msg.subscribe.forEach(id => monitorAssets.add(id))
