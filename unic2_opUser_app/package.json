@@ -16,7 +16,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.10.1",
-    "unic2-opuser-sdk": "^0.0.1"
+    "unic2-opuser-sdk": "*"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
