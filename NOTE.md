@@ -15,6 +15,10 @@ npm run dev
 Start: 
 npm run dev
 
+# unic2_asset_app
+This app is supposed to run in the Ec2 instance with GPU, together with the simulated drone/robot
+Run ./watchChange.sh to keep syncing any source code change to the ec2 instance
+
 
 # AssetSDK
 Start (There is test asset python code in it):
