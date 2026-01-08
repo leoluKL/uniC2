@@ -72,6 +72,9 @@ class DroneClient:
         
         # Calculate target absolute altitude
         # We need the absolute altitude for the MAVSDK goto_location command
+        if current_rel_alt+target_rel_alt_m<0:
+            target_rel_alt_m= -current_rel_alt
+
         target_abs_alt = current_abs_alt + target_rel_alt_m
 
         # Command the movement (heading 0 for North)
